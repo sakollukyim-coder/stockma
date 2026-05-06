@@ -1,0 +1,10 @@
+{
+  "name": "stock-manager",
+  "version": "1.0.0",
+  "description": "ระบบจัดการสต็อคแว่นตาแบบ full-stack ด้วย Node.js HTTP server และ JSON database",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {}
+}

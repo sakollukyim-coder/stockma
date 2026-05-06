@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบจัดการสต็อคแว่นตา</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body onload="initApp()">
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">👓</div>
+      <div class="logo-text">StockVision
+        <small>ระบบสต็อคแว่นตา</small>
+      </div>
+    </div>
+    <nav class="nav-section">
+      <div class="nav-label">เมนูหลัก</div>
+      <div class="nav-item active" data-page="dashboard">📊 Dashboard</div>
+      <div class="nav-item" data-page="stock">📦 รายการสต็อค <span class="badge" id="badge-stock"></span></div>
+      <div class="nav-item" data-page="movements">↕️ เข้า-ออกสต็อค</div>
+      <div class="nav-item" data-page="alerts">🔔 การแจ้งเตือน <span class="badge warn" id="badge-alerts"></span></div>
+      <div class="nav-item" data-page="settings">⚙️ ตั้งค่าระบบ</div>
+    </nav>
+    <nav class="nav-section">
+      <div class="nav-label">หมวดหมู่สินค้า <button class="icon-button" onclick="openModal('add-cat')" title="เพิ่มหมวดหมู่">+</button></div>
+      <div id="sidebar-cats"></div>
+    </nav>
+    <div class="sidebar-footer">
+      ผู้ใช้: <strong>ผู้ดูแลระบบ</strong><br>
+      อัปเดตล่าสุด: <span id="last-update"></span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="page-title" id="page-title">Dashboard</div>
+      <div class="topbar-actions">
+        <div class="search-box" style="width:220px;">
+          <span class="search-icon">🔍</span>
+          <input type="text" placeholder="ค้นหาสินค้า..." id="global-search" oninput="globalSearch(this.value)">
+        </div>
+        <button class="btn success" onclick="openModal('in')">+ เพิ่มสต็อค</button>
+        <button class="btn danger" onclick="openModal('out')">− จ่ายสต็อค</button>
+        <button class="btn primary" onclick="openModal('add-item')">✚ เพิ่มรายการใหม่</button>
+        <div style="position:relative;">
+          <button class="btn" onclick="toggleExportMenu()" id="export-btn">📤 Export ▾</button>
+          <div id="export-menu" style="display:none; position:absolute; right:0; top:36px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:6px; z-index:50; min-width:200px; box-shadow:0 4px 20px rgba(0,0,0,0.4);">
+            <div onclick="downloadCSV('items')" class="export-item">📊 Export สต็อค (CSV)</div>
+            <div onclick="downloadCSV('transactions')" class="export-item">↕️ Export ประวัติ (CSV)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="content">
+
+      <div class="page active" id="page-dashboard">
+        <div class="grid grid-4 mb-2">
+          <div class="card pointer" onclick="showPage('stock'); filterStatus('all', 0)">
+            <div class="card-title">รายการสินค้าทั้งหมด</div>
+            <div class="card-value" id="stat-total">0</div>
+            <div class="card-sub">SKU ในระบบ · คลิกดูทั้งหมด →</div>
+          </div>
+          <div class="card pointer" onclick="showPage('stock'); filterStatus('high', 1)">
+            <div class="card-title">สต็อคมากเกินไป</div>
+            <div class="card-value purple" id="stat-high">0</div>
+            <div class="card-sub" id="stat-high-sub">รายการ · คลิกดูรายการ →</div>
+          </div>
+          <div class="card pointer" onclick="showPage('stock'); filterStatus('low', 3)">
+            <div class="card-title">ใกล้หมด</div>
+            <div class="card-value yellow" id="stat-low">0</div>
+            <div class="card-sub" id="stat-low-sub">รายการ · คลิกดูรายการ →</div>
+          </div>
+          <div class="card pointer" onclick="showPage('stock'); filterStatus('out', 4)">
+            <div class="card-title">หมดสต็อค</div>
+            <div class="card-value red" id="stat-out">0</div>
+            <div class="card-sub">รายการที่ต้องสั่งด่วน · คลิกดูรายการ →</div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="margin-bottom:16px; gap:16px;">
+          <div class="card">
+            <div class="section-header"><div class="section-title">สถานะสต็อคตามหมวดหมู่</div></div>
+            <div id="category-chart"></div>
+          </div>
+          <div class="card">
+            <div class="section-header"><div class="section-title">⚠️ รายการต้องดำเนินการ</div></div>
+            <div id="alert-list"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-header">
+            <div class="section-title">การเคลื่อนไหวสต็อคล่าสุด</div>
+            <button class="btn sm" onclick="showPage('movements')">ดูทั้งหมด →</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>วันที่</th><th>ประเภท</th><th>สินค้า</th><th>จำนวน</th><th>ผู้บันทึก</th><th>หมายเหตุ</th>
+              </tr></thead>
+              <tbody id="recent-movements"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="page" id="page-stock">
+        <div class="flex gap-3" style="margin-bottom:14px; flex-wrap:wrap; align-items:center;">
+          <div class="filter-tabs" id="status-filter">
+            <button class="filter-tab active" onclick="filterStatus('all', 0)">ทั้งหมด</button>
+            <button class="filter-tab" onclick="filterStatus('high', 1)">🟣 มากเกินไป</button>
+            <button class="filter-tab" onclick="filterStatus('ok', 2)">🟢 ปกติ</button>
+            <button class="filter-tab" onclick="filterStatus('low', 3)">🟡 ใกล้หมด</button>
+            <button class="filter-tab" onclick="filterStatus('out', 4)">🔴 หมด</button>
+          </div>
+          <div style="margin-left:auto; display:flex; gap:8px;">
+            <select id="cat-filter" onchange="filterByCategory(this.value)" style="width:160px; height:32px; font-size:12px;">
+              <option value="">ทุกหมวดหมู่</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>#</th><th>ชื่อสินค้า</th><th>หมวดหมู่</th><th>หน่วย</th>
+              <th>สต็อคปัจจุบัน / เกณฑ์</th><th>Min</th><th>Max</th><th>สถานะ</th>
+              <th>ค้างสต็อค</th><th>จัดการ</th>
+            </tr></thead>
+            <tbody id="stock-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="page" id="page-movements">
+        <div class="flex gap-2" style="margin-bottom:14px; flex-wrap:wrap; align-items:center;">
+          <div class="filter-tabs">
+            <button class="filter-tab active" onclick="filterTx('all', this)">ทั้งหมด</button>
+            <button class="filter-tab" onclick="filterTx('in', this)">📥 เข้า</button>
+            <button class="filter-tab" onclick="filterTx('out', this)">📤 ออก</button>
+          </div>
+          <div style="margin-left:auto; font-size:13px; color:var(--text2);" id="tx-summary"></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>วันที่</th><th>ประเภท</th><th>สินค้า</th><th>หมวดหมู่</th>
+              <th>จำนวน</th><th>ผู้บันทึก</th><th>ผู้จัดส่ง/ร้านค้า</th><th>หมายเหตุ</th>
+            </tr></thead>
+            <tbody id="tx-table"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="page" id="page-alerts">
+        <div id="alerts-content"></div>
+      </div>
+
+      <div class="page" id="page-settings">
+        <div class="grid grid-2" style="gap:20px;">
+          <div class="card">
+            <div class="section-header"><div class="section-title">⚙️ ตั้งค่าเกณฑ์สถานะสต็อค</div></div>
+            <p class="help-text">
+              ระบบจะคำนวณสถานะของแต่ละรายการจาก <strong>% ของยอด Max</strong> เช่น qty / max ≥ 80% แสดงว่าสต็อคมากเกินไป
+            </p>
+            <div class="settings-box">
+              <div class="setting-row">
+                <span class="setting-label">🟣 มากเกินไป (Overstock)</span>
+                <input type="number" id="thresh-high" min="1" max="100" value="80" oninput="previewThreshold()"><span>%</span>
+              </div>
+              <div class="setting-row">
+                <span class="setting-label">🟡 ใกล้หมด (Low Stock)</span>
+                <input type="number" id="thresh-low" min="1" max="100" value="30" oninput="previewThreshold()"><span>%</span>
+              </div>
+              <div class="setting-row">
+                <span class="setting-label">⏳ ค้างสต็อคนาน</span>
+                <input type="number" id="thresh-stale" min="1" value="90" oninput="previewThreshold()"><span>วัน</span>
+              </div>
+            </div>
+            <div id="threshold-preview" class="threshold-preview"></div>
+            <button class="btn primary full-width" onclick="saveThresholds()">💾 บันทึกเกณฑ์สถานะ</button>
+          </div>
+          <div class="card">
+            <div class="section-header">
+              <div class="section-title">📁 จัดการหมวดหมู่สินค้า</div>
+              <button class="btn success sm" onclick="openModal('add-cat')">+ เพิ่มหมวดหมู่</button>
+            </div>
+            <div id="cat-manage-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modal-overlay"><div class="modal" id="modal-body"></div></div>
+<div class="toast-wrap" id="toast-wrap"></div>
+<script src="app.js"></script>
+</body>
+</html>
